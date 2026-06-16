@@ -1,0 +1,13 @@
+schema_version = "1.0.0"
+id = "mcbedrockparticles"
+version = "2.0.0"
+name = "MCBedrockParticles"
+tagline = "Import Bedrock Particles"
+description = "Import Minecraft Bedrock & Java Particle JSONs as fully animated/baked keyframes via Python MoLang Simulator"
+author = "MrRobot"
+maintainer = "MrRobot"
+type = "add-on"
+blender_version_min = "4.2.0"
+license = [
+  "SPDX-License-Identifier: GPL-2.0-or-later"
+]
