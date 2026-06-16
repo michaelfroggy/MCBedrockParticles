@@ -71,9 +71,9 @@ def create_billboard_instance(context, identifier, width=0.1, height=0.1, facing
             
             # The lock axis depends on which axis builder.py aligned to the velocity.
             # We will configure builder.py to align the matching axis.
-            if facing_mode == "direction_x":
+            if facing_mode == "direction_x" or facing_mode == "lookat_direction":
                 tt.lock_axis = 'LOCK_X'
-            elif facing_mode == "direction_y" or facing_mode == "lookat_direction":
+            elif facing_mode == "direction_y":
                 tt.lock_axis = 'LOCK_Y'
             elif facing_mode == "direction_z":
                 tt.lock_axis = 'LOCK_Z'
@@ -253,7 +253,7 @@ def _build_standard_material(nodes, links, tex_node, obj_info, bsdf, is_alpha, i
                 bsdf.inputs['Emission Strength'].default_value = 1.0
 
 
-def create_particle_material(obj, texture_path, material_type, is_lit=False):
+def create_particle_material(obj, texture_path, material_type, is_lit=False, interpolation='Closest'):
     """
     Creates a particle material suited to the Bedrock material type:
 
@@ -308,7 +308,7 @@ def create_particle_material(obj, texture_path, material_type, is_lit=False):
         tex_node.location = (-300, 300)
         img = bpy.data.images.load(texture_path)
         tex_node.image = img
-        tex_node.interpolation = 'Closest'  # Pixel-art style for Minecraft textures
+        tex_node.interpolation = interpolation
 
         # ------------------------------------------------------------------
         # UV Attribute Nodes (single floats for compatibility)

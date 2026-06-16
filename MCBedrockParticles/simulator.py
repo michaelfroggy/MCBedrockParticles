@@ -187,29 +187,29 @@ class BedrockSimulator:
                 if curve_type == "catmull_rom" and len(nodes) >= 4:
                     n = len(nodes)
                     segment_count = n - 3
-                    
-                    t_clamped = max(0.0, min(1.0, t))
-                    scaled_t = t_clamped * segment_count
+                    scaled_t = t * segment_count
                     
                     seg_idx = int(math.floor(scaled_t))
                     local_t = scaled_t - seg_idx
-                    if seg_idx >= segment_count:
-                        seg_idx = segment_count - 1
-                        local_t = 1.0
+                    
+                    def get_node(i):
+                        if i < 0: return nodes[0]
+                        if i >= n: return nodes[-1]
+                        return nodes[i]
 
-                    p0 = nodes[seg_idx]
-                    p1 = nodes[seg_idx + 1]
-                    p2 = nodes[seg_idx + 2]
-                    p3 = nodes[seg_idx + 3]
+                    p0 = get_node(seg_idx)
+                    p1 = get_node(seg_idx + 1)
+                    p2 = get_node(seg_idx + 2)
+                    p3 = get_node(seg_idx + 3)
 
                     lt2 = local_t * local_t
                     lt3 = lt2 * local_t
 
                     res = 0.5 * (
-                        (2 * p1) +
+                        (2.0 * p1) +
                         (-p0 + p2) * local_t +
-                        (2 * p0 - 5 * p1 + 4 * p2 - p3) * lt2 +
-                        (-p0 + 3 * p1 - 3 * p2 + p3) * lt3
+                        (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * lt2 +
+                        (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * lt3
                     )
                 else:
                     segment_count = len(nodes) - 1
@@ -392,7 +392,22 @@ class BedrockSimulator:
         if self.static_emitter_matrix:
             mat = self.static_emitter_matrix
         elif self.emitter_matrices and frame < len(self.emitter_matrices):
-            mat = self.emitter_matrices[frame]
+            mat_curr = self.emitter_matrices[frame]
+            mat = mat_curr
+            
+            if fraction_offset is not None and self.dt > 0.0 and frame > 0:
+                mat_prev = self.emitter_matrices[frame - 1]
+                alpha = fraction_offset / self.dt
+                alpha = max(0.0, min(1.0, alpha))
+                
+                loc_p, rot_p, sca_p = mat_prev.decompose()
+                loc_c, rot_c, sca_c = mat_curr.decompose()
+                
+                loc_i = loc_p.lerp(loc_c, alpha)
+                rot_i = rot_p.slerp(rot_c, alpha)
+                sca_i = sca_p.lerp(sca_c, alpha)
+                
+                mat = mathutils.Matrix.LocRotScale(loc_i, rot_i, sca_i)
             
         if mat is not None:
             
@@ -769,7 +784,7 @@ class BedrockSimulator:
                     'color': p.color,
                     'uv_offset': p.uv_offset,
                     'uv_scale': p.uv_scale,
-                    'rot_z': math.degrees(p.rotation),
+                    'rot_z': p.rotation,
                     'velocity': p.velocity.copy(),
                     'spawn_direction': p.spawn_direction.copy(),
                     'custom_direction': custom_direction_vec,

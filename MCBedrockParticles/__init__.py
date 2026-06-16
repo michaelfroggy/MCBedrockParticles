@@ -19,7 +19,7 @@ except ImportError:
     bpy = None
     ImportHelper = object
 
-if "builder" in locals():
+if "materials" in locals():
     import importlib
     importlib.reload(materials)
     importlib.reload(molang)
@@ -67,6 +67,16 @@ class MCBEDROCK_OT_import_particle(bpy.types.Operator, ImportHelper):
         default=False,
     )
 
+    interpolation: bpy.props.EnumProperty(
+        name="Texture Interpolation",
+        description="Choose how textures are rendered. Closest (Pixel Art) or Linear (Foggy/Soft)",
+        items=[
+            ('Closest', "Closest (Pixel Art)", "Minecraft default, sharp pixelated edges"),
+            ('Linear', "Linear (Soft/Foggy)", "Soft edges, good for glows, smoke, tractor beams"),
+        ],
+        default='Closest',
+    )
+
     def execute(self, context):
         import os
         try:
@@ -81,7 +91,8 @@ class MCBEDROCK_OT_import_particle(bpy.types.Operator, ImportHelper):
                     filepath, 
                     texture_override=tex_override,
                     spawn_offset=(0.0, 0.0, 0.0),
-                    force_loop=self.force_loop
+                    force_loop=self.force_loop,
+                    interpolation=self.interpolation
                 )
                 
                 emitter = context.active_object
@@ -89,6 +100,7 @@ class MCBEDROCK_OT_import_particle(bpy.types.Operator, ImportHelper):
                     emitter["mcbedrock_filepath"] = filepath
                     emitter["mcbedrock_texture"] = tex_override
                     emitter["mcbedrock_force_loop"] = self.force_loop
+                    emitter["mcbedrock_interpolation"] = self.interpolation
                     
                     # Apply current live slider values to the newly created active object
                     update_scales(emitter, context)
@@ -113,6 +125,8 @@ class MCBEDROCK_OT_import_particle(bpy.types.Operator, ImportHelper):
         layout.label(text="Leave blank to auto-resolve from resource pack.", icon='INFO')
         layout.separator()
         layout.prop(self, "force_loop")
+        layout.separator()
+        layout.prop(self, "interpolation")
 
 
 class MCBEDROCK_OT_set_resource_pack(bpy.types.Operator, ImportHelper):
@@ -219,7 +233,7 @@ class MCBEDROCK_OT_set_texture(bpy.types.Operator, ImportHelper):
             self.report({'ERROR'}, f"File not found: {self.filepath}")
             return {'CANCELLED'}
 
-        create_particle_material(target, self.filepath, "particles_alpha")
+        create_particle_material(target, {'color': self.filepath}, "particles_alpha")
         self.report({'INFO'}, f"Applied texture: {os.path.basename(self.filepath)}")
         return {'FINISHED'}
 
@@ -295,6 +309,7 @@ class MCBEDROCK_OT_bake_world_space(bpy.types.Operator):
             
         tex_override = emitter.get("mcbedrock_texture", "")
         force_loop = emitter.get("mcbedrock_force_loop", False)
+        interpolation = emitter.get("mcbedrock_interpolation", "Closest")
         
         # Save Emitter properties
         anim_scale = emitter.mcbedrock_animation_scale
@@ -310,7 +325,8 @@ class MCBEDROCK_OT_bake_world_space(bpy.types.Operator):
             texture_override=tex_override,
             spawn_offset=(0.0, 0.0, 0.0),
             force_loop=force_loop,
-            existing_emitter=emitter
+            existing_emitter=emitter,
+            interpolation=interpolation
         )
         
         if result and result.get("warning"):
@@ -510,7 +526,7 @@ def register():
         bpy.types.Scene.mcbedrock_bake_frames = bpy.props.IntProperty(
             name="Bake Duration",
             description="Frames to simulate",
-            default=1000,
+            default=400,
             min=1
         )
 

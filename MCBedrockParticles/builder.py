@@ -202,16 +202,16 @@ def resolve_texture_java(context, tex_relative, json_filepath):
     return tex_relative
 
 
-def build_particle_system(context, filepath, texture_override="", spawn_offset=(0.0, 0.0, 0.0), force_loop=False, existing_emitter=None):
+def build_particle_system(context, filepath, texture_override="", spawn_offset=(0.0, 0.0, 0.0), force_loop=False, existing_emitter=None, interpolation='Closest'):
     """
     Main entrypoint. Detects format and routes to the correct builder.
     """
     fmt = detect_format(filepath)
 
     if fmt == "bedrock":
-        return _build_bedrock(context, filepath, texture_override, spawn_offset, force_loop, existing_emitter)
+        return _build_bedrock(context, filepath, texture_override, spawn_offset, force_loop, existing_emitter, interpolation)
     elif fmt == "java":
-        return _build_java(context, filepath, texture_override, spawn_offset)
+        return _build_java(context, filepath, texture_override, spawn_offset, interpolation)
     else:
         raise ValueError(
             "Unrecognized particle JSON format. "
@@ -266,7 +266,7 @@ def simulate_recursively(filepath, context, fps, duration_frames, start_frame=1,
     return global_particles_dict
 
 
-def _build_bedrock(context, filepath, texture_override="", spawn_offset=(0.0, 0.0, 0.0), force_loop=False, existing_emitter=None):
+def _build_bedrock(context, filepath, texture_override="", spawn_offset=(0.0, 0.0, 0.0), force_loop=False, existing_emitter=None, interpolation='Closest'):
     """Build a baked particle system from a Bedrock particle JSON using the Python Simulator."""
     from .simulator import BedrockSimulator
     
@@ -360,7 +360,7 @@ def _build_bedrock(context, filepath, texture_override="", spawn_offset=(0.0, 0.
         if not os.path.isfile(abs_tex):
             warning = f"Texture not found: '{sub_parser.get_texture_path()}'. Set your Resource Pack path or use manual texture."
 
-        create_particle_material(base_instance, abs_tex, parser.get_material_type(), is_lit=parser.has_lighting())
+        create_particle_material(base_instance, abs_tex, parser.get_material_type(), is_lit=parser.has_lighting(), interpolation=interpolation)
 
         base_instance.hide_set(False)
         base_instance.hide_render = False
@@ -418,10 +418,10 @@ def _build_bedrock(context, filepath, texture_override="", spawn_offset=(0.0, 0.
             uv_ox, uv_oy, uv_sx, uv_sy = [], [], [], []
             rot_type = 'XYZ'
             rot_w, rot_x, rot_y, rot_z = [], [], [], []
-            hide_vals = []
             
             def add_frame(f, loc, sc, col, uvo, uvs, rtype, rval, hide):
-                hide_vals.append(float(hide))
+                # We do NOT use hide arrays anymore, we rely entirely on scale (0,0,0) to hide particles.
+                # Teleporting objects causes Eevee TAA ghosting and massive 3 FPS lag, so we rely on scale!
                 times.append(f)
                 locs_x.append(loc[0]); locs_y.append(loc[1]); locs_z.append(loc[2])
                 scales_x.append(sc[0]); scales_y.append(sc[1]); scales_z.append(sc[2])
@@ -433,16 +433,23 @@ def _build_bedrock(context, filepath, texture_override="", spawn_offset=(0.0, 0.
                 else:
                     rot_w.append(0.0); rot_x.append(0.0); rot_y.append(0.0); rot_z.append(rval)
                     
-            # Initial dead state
-            add_frame(0, _OFFSCREEN, (0.0, 0.0, 0.0), (1.0, 1.0, 1.0, 1.0), (0.0, 0.0), (1.0, 1.0), 'XYZ', 0.0, True)
-            if first_frame > 1:
-                add_frame(first_frame - 1, _OFFSCREEN, (0.0, 0.0, 0.0), (1.0, 1.0, 1.0, 1.0), (0.0, 0.0), (1.0, 1.0), 'XYZ', 0.0, True)
-                
+            # Keyframe before birth (hidden via scale 0)
+            import mathutils
             import math
+            history_frames = p.history
+            emitter_matrix = emitter_matrices[0] if emitter_matrices else emitter.matrix_world
+            
+            if first_frame > 1:
+                first_state = history_frames[first_frame]
+                first_loc = emitter_matrix @ mathutils.Vector((first_state['pos'].x, -first_state['pos'].z, first_state['pos'].y))
+                add_frame(first_frame - 1, first_loc, (0.0, 0.0, 0.0), (1.0, 1.0, 1.0, 1.0), (0.0, 0.0), (1.0, 1.0), 'XYZ', 0.0, True)
+                # Ensure frame 0 is also keyed so it stays hidden
+                add_frame(0, first_loc, (0.0, 0.0, 0.0), (1.0, 1.0, 1.0, 1.0), (0.0, 0.0), (1.0, 1.0), 'XYZ', 0.0, True)
+
+            # Insert history
             for frame in frames:
-                state = p.history[frame]
-                mc_pos = state['pos']
-                loc = (mc_pos.x, -mc_pos.z, mc_pos.y)
+                state = history_frames[frame]
+                loc = emitter_matrix @ mathutils.Vector((state['pos'].x, -state['pos'].z, state['pos'].y))
                 sc = (state['scale_x'], state['scale_y'], 1.0)
                 c = state.get('color', [1.0, 1.0, 1.0, 1.0])
                 uvo = state.get('uv_offset', [0.0, 0.0])
@@ -461,16 +468,25 @@ def _build_bedrock(context, filepath, texture_override="", spawn_offset=(0.0, 0.
                     if vel is not None and vel.length > 0.0001:
                         vel_norm = vel.normalized()
                         import mathutils
-                        if facing_mode == 'direction_x':
+                        if facing_mode == 'lookat_direction':
+                            cd = state.get('custom_direction')
+                            if not cd: cd = mathutils.Vector((0, 0, -1))
+                            bl_cd = mathutils.Vector((cd.x, -cd.z, cd.y)).normalized()
                             default_forward = mathutils.Vector((1, 0, 0))
-                        elif facing_mode == 'direction_z':
-                            default_forward = mathutils.Vector((0, 0, 1))
+                            rot_quat = default_forward.rotation_difference(bl_cd)
+                            spin_quat = mathutils.Quaternion((0, 0, 1), math.radians(rot_z_deg))
+                            final_quat = rot_quat @ spin_quat
                         else:
-                            default_forward = mathutils.Vector((0, 1, 0))
-                        forward = mathutils.Vector((vel_norm.x, -vel_norm.z, vel_norm.y))
-                        rot_quat = default_forward.rotation_difference(forward)
-                        spin_quat = mathutils.Quaternion((0, 0, 1), math.radians(rot_z_deg))
-                        final_quat = rot_quat @ spin_quat
+                            if facing_mode == 'direction_x':
+                                default_forward = mathutils.Vector((1, 0, 0))
+                            elif facing_mode == 'direction_z':
+                                default_forward = mathutils.Vector((0, 0, 1))
+                            else:
+                                default_forward = mathutils.Vector((0, 1, 0))
+                            forward = mathutils.Vector((vel_norm.x, -vel_norm.z, vel_norm.y))
+                            rot_quat = default_forward.rotation_difference(forward)
+                            spin_quat = mathutils.Quaternion((0, 0, 1), math.radians(rot_z_deg))
+                            final_quat = rot_quat @ spin_quat
                         rt = 'QUATERNION'
                         rv = final_quat
                 
@@ -479,7 +495,9 @@ def _build_bedrock(context, filepath, texture_override="", spawn_offset=(0.0, 0.
                 add_frame(frame, loc, sc, c, uvo, uvs, rt, rv, False)
                 
             # Post-death state
-            add_frame(last_frame + 1, _OFFSCREEN, (0.0, 0.0, 0.0), (1.0, 1.0, 1.0, 1.0), (0.0, 0.0), (1.0, 1.0), 'XYZ', 0.0, True)
+            last_state = history_frames[last_frame]
+            last_loc = emitter_matrix @ mathutils.Vector((last_state['pos'].x, -last_state['pos'].z, last_state['pos'].y))
+            add_frame(last_frame + 1, last_loc, (0.0, 0.0, 0.0), (1.0, 1.0, 1.0, 1.0), (0.0, 0.0), (1.0, 1.0), 'XYZ', 0.0, True)
             
             # Build fcurves fast
             def apply_fcurve(data_path, idx, vals):
@@ -494,7 +512,7 @@ def _build_bedrock(context, filepath, texture_override="", spawn_offset=(0.0, 0.
                 flat[1::2] = vals
                 fc.keyframe_points.foreach_set('co', flat)
                 # Default linear, color/uv use constant
-                if data_path.startswith('["uv_') or data_path.startswith('hide_'):
+                if data_path.startswith('["uv_'):
                     for kp in fc.keyframe_points:
                         kp.interpolation = 'CONSTANT'
                 else:
@@ -524,9 +542,6 @@ def _build_bedrock(context, filepath, texture_override="", spawn_offset=(0.0, 0.
             else:
                 apply_fcurve("rotation_euler", 2, rot_z)
                 
-            apply_fcurve("hide_viewport", 0, hide_vals)
-            apply_fcurve("hide_render", 0, hide_vals)
-                
             # Interpolation is already applied during apply_fcurve
                                     
             # Push into NLA track so we can scale speed live
@@ -550,7 +565,7 @@ def _build_bedrock(context, filepath, texture_override="", spawn_offset=(0.0, 0.
 
     return {"warning": warning}
 
-def _build_java(context, filepath, texture_override="", spawn_offset=(0.0, 0.0, 0.0)):
+def _build_java(context, filepath, texture_override="", spawn_offset=(0.0, 0.0, 0.0), interpolation='Closest'):
     """Build a baked particle system from a Java particle JSON."""
     from .java_parser import JavaParticleParser
     
@@ -601,7 +616,7 @@ def _build_java(context, filepath, texture_override="", spawn_offset=(0.0, 0.0, 
             f"Set your Resource Pack path or use manual texture."
         )
 
-    create_particle_material(instance_obj, abs_tex, "particles_alpha")
+    create_particle_material(instance_obj, abs_tex, "particles_alpha", interpolation=interpolation)
 
     settings.render_type = 'OBJECT'
     settings.instance_object = instance_obj
