@@ -1,7 +1,7 @@
 bl_info = {
     "name": "MC Bedrock Particles",
     "author": "michaelfroggy",
-    "version": (1, 0, 2),
+    "version": (1, 0, 0),
     "blender": (2, 80, 0),
     "location": "View3D > Sidebar > MC Particles",
     "description": "Import and bake Minecraft Bedrock & Java particles.",
