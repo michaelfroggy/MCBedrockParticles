@@ -71,9 +71,9 @@ def create_billboard_instance(context, identifier, width=0.1, height=0.1, facing
             
             # The lock axis depends on which axis builder.py aligned to the velocity.
             # We will configure builder.py to align the matching axis.
-            if facing_mode == "direction_x" or facing_mode == "lookat_direction":
+            if facing_mode == "direction_x":
                 tt.lock_axis = 'LOCK_X'
-            elif facing_mode == "direction_y":
+            elif facing_mode == "direction_y" or facing_mode == "lookat_direction":
                 tt.lock_axis = 'LOCK_Y'
             elif facing_mode == "direction_z":
                 tt.lock_axis = 'LOCK_Z'

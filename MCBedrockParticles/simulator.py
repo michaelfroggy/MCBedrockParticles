@@ -397,18 +397,18 @@ class BedrockSimulator:
         if mat is not None:
             
             # 1. Transform offset
-            # Bedrock (x, y, z) -> Blender (x, z, -y)
-            bl_offset = mathutils.Vector((offset.x, offset.z, -offset.y))
+            # Bedrock (X, Y, Z) -> Blender (X, Z, Y)
+            bl_offset = mathutils.Vector((offset.x, offset.z, offset.y))
             # Apply matrix
             bl_offset = mat @ bl_offset
-            # Blender (X, Y, Z) -> Bedrock (X, Z, -Y)
-            offset = mathutils.Vector((bl_offset.x, bl_offset.z, -bl_offset.y))
+            # Blender (X, Y, Z) -> Bedrock (X, Z, Y)
+            offset = mathutils.Vector((bl_offset.x, bl_offset.z, bl_offset.y))
             
             # 2. Transform direction (velocity vector)
-            bl_dir = mathutils.Vector((direction.x, direction.z, -direction.y))
+            bl_dir = mathutils.Vector((direction.x, direction.z, direction.y))
             # Apply matrix rotation only
             bl_dir = mat.to_3x3() @ bl_dir
-            direction = mathutils.Vector((bl_dir.x, bl_dir.z, -bl_dir.y)).normalized()
+            direction = mathutils.Vector((bl_dir.x, bl_dir.z, bl_dir.y)).normalized()
             
             # Save matrix for linear_acceleration
             p.spawn_matrix = mat.to_3x3()
@@ -444,7 +444,7 @@ class BedrockSimulator:
                 p.triggered_events.append({
                     "time": self.anim_time,
                     "event_name": creation_event,
-                    "matrix": mathutils.Matrix.Translation(mathutils.Vector((p.position.x, p.position.z, -p.position.y)))
+                    "matrix": mathutils.Matrix.Translation(mathutils.Vector((p.position.x, p.position.z, p.position.y)))
                 })
                 self.all_triggered_events.append(p.triggered_events[-1])
 
@@ -527,9 +527,9 @@ class BedrockSimulator:
                     az = self.evaluate_val(linear_accel[2] if len(linear_accel)>2 else 0, ctx_p)
                     
                     if getattr(p, 'spawn_matrix', None):
-                        bl_accel = mathutils.Vector((ax, az, -ay))
+                        bl_accel = mathutils.Vector((ax, az, ay))
                         bl_accel = p.spawn_matrix @ bl_accel
-                        ax, ay, az = bl_accel.x, -bl_accel.z, bl_accel.y
+                        ax, ay, az = bl_accel.x, bl_accel.z, bl_accel.y
                     
                     drag = self.evaluate_val(linear_drag, ctx_p)
                     
@@ -793,7 +793,7 @@ class BedrockSimulator:
                                 p.triggered_events.append({
                                     "time": self.anim_time,
                                     "event_name": event_name,
-                                    "matrix": mathutils.Matrix.Translation(mathutils.Vector((p.position.x, p.position.z, -p.position.y)))
+                                    "matrix": mathutils.Matrix.Translation(mathutils.Vector((p.position.x, p.position.z, p.position.y)))
                                 })
                                 self.all_triggered_events.append(p.triggered_events[-1])
                         except ValueError:
@@ -806,7 +806,7 @@ class BedrockSimulator:
                             p.triggered_events.append({
                                 "time": self.anim_time,
                                 "event_name": expire_event,
-                                "matrix": mathutils.Matrix.Translation(mathutils.Vector((p.position.x, p.position.z, -p.position.y)))
+                                "matrix": mathutils.Matrix.Translation(mathutils.Vector((p.position.x, p.position.z, p.position.y)))
                             })
                             self.all_triggered_events.append(p.triggered_events[-1])
 

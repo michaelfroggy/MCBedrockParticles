@@ -461,7 +461,7 @@ def _build_bedrock(context, filepath, texture_override="", spawn_offset=(0.0, 0.
                     if vel is not None and vel.length > 0.0001:
                         vel_norm = vel.normalized()
                         import mathutils
-                        if facing_mode == 'direction_x' or facing_mode == 'lookat_direction':
+                        if facing_mode == 'direction_x':
                             default_forward = mathutils.Vector((1, 0, 0))
                         elif facing_mode == 'direction_z':
                             default_forward = mathutils.Vector((0, 0, 1))
