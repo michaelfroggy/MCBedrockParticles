@@ -36,10 +36,9 @@ def create_billboard_instance(context, identifier, width=0.1, height=0.1, facing
     if facing_mode in ("rotate_xyz", "lookat_xyz"):
         # Full camera-facing — exactly the original behaviour
         if cam:
-            tt = plane.constraints.new(type='TRACK_TO')
+            tt = plane.constraints.new(type='DAMPED_TRACK')
             tt.target = cam
             tt.track_axis = 'TRACK_Z'
-            tt.up_axis = 'UP_Y'
         else:
             # Stand it up vertically so it faces the front by default
             plane.rotation_euler[0] = radians(90)
@@ -87,10 +86,9 @@ def create_billboard_instance(context, identifier, width=0.1, height=0.1, facing
     else:
         # Unknown / future mode — fall back to full camera-facing
         if cam:
-            tt = plane.constraints.new(type='TRACK_TO')
+            tt = plane.constraints.new(type='DAMPED_TRACK')
             tt.target = cam
             tt.track_axis = 'TRACK_Z'
-            tt.up_axis = 'UP_Y'
         else:
             plane.rotation_euler[0] = radians(90)
 

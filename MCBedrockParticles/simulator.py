@@ -257,7 +257,16 @@ class BedrockSimulator:
             y = radius * math.sin(phi) * math.sin(theta)
             z = radius * math.cos(phi)
             offset += mathutils.Vector((x, y, z))
-            direction = mathutils.Vector((x, y, z)).normalized() if radius > 0 else direction
+            shape_dir = self.shape_data.get("direction", "outwards")
+            if isinstance(shape_dir, list) and len(shape_dir) == 3:
+                dx = self.evaluate_val(shape_dir[0], ctx)
+                dy = self.evaluate_val(shape_dir[1], ctx)
+                dz = self.evaluate_val(shape_dir[2], ctx)
+                direction = mathutils.Vector((dx, dy, dz)).normalized()
+            elif shape_dir == "inwards":
+                direction = -mathutils.Vector((x, y, z)).normalized() if radius > 0 else direction
+            else:
+                direction = mathutils.Vector((x, y, z)).normalized() if radius > 0 else direction
             
             if self.shape_data.get("surface_only", False) == False:
                 # Inside sphere
