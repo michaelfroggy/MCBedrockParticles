@@ -576,11 +576,28 @@ def _build_java(context, filepath, texture_override="", spawn_offset=(0.0, 0.0, 
     bake_frames = getattr(context.scene, "mcbedrock_bake_frames", 250)
     fps = context.scene.render.fps
 
-    # Java particles don't define emitter shape — use a point emitter
+    # Create Dedicated Collection
+    col_name = f"MC_{short_name}"
+    if col_name in bpy.data.collections:
+        i = 1
+        while f"{col_name}.{i:03d}" in bpy.data.collections:
+            i += 1
+        col_name = f"{col_name}.{i:03d}"
+        
+    group_col = bpy.data.collections.new(col_name)
+    context.collection.children.link(group_col)
+
+    # Java particles don't define emitter shape - use a point emitter
     bpy.ops.mesh.primitive_cube_add(size=0.02, enter_editmode=False, location=spawn_offset)
     emitter = context.active_object
     emitter.name = f"Emitter_{short_name}"
     emitter.display_type = 'WIRE'
+    
+    # Move emitter to new collection
+    group_col.objects.link(emitter)
+    for col in emitter.users_collection:
+        if col != group_col:
+            col.objects.unlink(emitter)
 
     mod = emitter.modifiers.new(name="JavaParticles", type='PARTICLE_SYSTEM')
     psys = emitter.particle_systems[mod.name]
@@ -596,6 +613,12 @@ def _build_java(context, filepath, texture_override="", spawn_offset=(0.0, 0.0, 
 
     # Billboard instance
     instance_obj = create_billboard_instance(context, ident, 0.1, 0.1)
+    
+    # Move base_instance to new collection
+    group_col.objects.link(instance_obj)
+    for col in instance_obj.users_collection:
+        if col != group_col:
+            col.objects.unlink(instance_obj)
 
     # Texture resolution
     if texture_override and os.path.isfile(texture_override):
