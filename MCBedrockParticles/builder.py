@@ -575,9 +575,6 @@ def _build_java(context, filepath, texture_override="", spawn_offset=(0.0, 0.0, 
     
     bake_frames = getattr(context.scene, "mcbedrock_bake_frames", 250)
     fps = context.scene.render.fps
-    
-    parser.dt = 1.0 / fps
-    particles = parser.generate_particles(duration_frames=bake_frames)
 
     # Java particles don't define emitter shape — use a point emitter
     bpy.ops.mesh.primitive_cube_add(size=0.02, enter_editmode=False, location=spawn_offset)
