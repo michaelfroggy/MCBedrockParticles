@@ -357,6 +357,23 @@ class BedrockSimulator:
 
         return offset, direction
 
+    def _trigger_events(self, p, ev_names):
+        if not ev_names:
+            return
+        if isinstance(ev_names, str):
+            ev_names = [ev_names]
+        elif not isinstance(ev_names, list):
+            return
+            
+        mat = mathutils.Matrix.Translation(mathutils.Vector((p.position.x, p.position.z, p.position.y)))
+        for ev in ev_names:
+            p.triggered_events.append({
+                "time": self.anim_time,
+                "event_name": str(ev),
+                "matrix": mat
+            })
+            self.all_triggered_events.append(p.triggered_events[-1])
+
     def spawn_particle(self, fraction_offset=0.0, frame=1):
         p = ParticleState(self.next_particle_id)
         self.next_particle_id += 1
@@ -455,13 +472,7 @@ class BedrockSimulator:
         # Check creation_event
         if self.lifetime_events:
             creation_event = self.lifetime_events.get("creation_event")
-            if creation_event:
-                p.triggered_events.append({
-                    "time": self.anim_time,
-                    "event_name": creation_event,
-                    "matrix": mathutils.Matrix.Translation(mathutils.Vector((p.position.x, p.position.z, p.position.y)))
-                })
-                self.all_triggered_events.append(p.triggered_events[-1])
+            self._trigger_events(p, creation_event)
 
     def simulate(self):
         ctx_init = self.get_context()
@@ -800,30 +811,19 @@ class BedrockSimulator:
                 if self.lifetime_events:
                     # Timeline events
                     timeline = self.lifetime_events.get("timeline", {})
-                    for t_str, event_name in timeline.items():
+                    for t_str, event_names in timeline.items():
                         try:
                             t_val = float(t_str)
                             if p.age >= t_val and t_str not in p.fired_timeline_events:
                                 p.fired_timeline_events.add(t_str)
-                                p.triggered_events.append({
-                                    "time": self.anim_time,
-                                    "event_name": event_name,
-                                    "matrix": mathutils.Matrix.Translation(mathutils.Vector((p.position.x, p.position.z, p.position.y)))
-                                })
-                                self.all_triggered_events.append(p.triggered_events[-1])
+                                self._trigger_events(p, event_names)
                         except ValueError:
                             pass
                             
                     # Expiration event
                     if not p.active:
                         expire_event = self.lifetime_events.get("expiration_event")
-                        if expire_event:
-                            p.triggered_events.append({
-                                "time": self.anim_time,
-                                "event_name": expire_event,
-                                "matrix": mathutils.Matrix.Translation(mathutils.Vector((p.position.x, p.position.z, p.position.y)))
-                            })
-                            self.all_triggered_events.append(p.triggered_events[-1])
+                        self._trigger_events(p, expire_event)
 
             self.emitter_age += self.dt
             self.anim_time += self.dt
