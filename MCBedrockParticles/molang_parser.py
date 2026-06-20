@@ -322,6 +322,11 @@ class MoLangCompiler:
 _compiler = MoLangCompiler()
 
 def evaluate(expression, ctx=None, default=0.0):
+    if isinstance(expression, list):
+        expression = " ".join(stmt if str(stmt).endswith(";") else str(stmt) + ";" for stmt in expression)
+    elif not isinstance(expression, str):
+        return default
+        
     if ctx is None:
         ctx = {}
     func = _compiler.compile(expression)
