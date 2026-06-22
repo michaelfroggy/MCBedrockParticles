@@ -319,9 +319,11 @@ def _build_bedrock(context, filepath, texture_override="", spawn_offset=(0.0, 0.
         context.collection.children.link(group_col)
 
         # Create Parent Emitter Empty
-        bpy.ops.object.empty_add(type='SPHERE', radius=0.5, location=spawn_offset)
-        emitter = context.active_object
-        emitter.name = f"Emitter_{short_name}"
+        emitter = bpy.data.objects.new(f"Emitter_{short_name}", None)
+        emitter.empty_display_type = 'SPHERE'
+        emitter.empty_display_size = 0.5
+        emitter.location = spawn_offset
+        context.collection.objects.link(emitter)
         
         # Move emitter to new collection
         group_col.objects.link(emitter)
@@ -549,7 +551,8 @@ def _build_bedrock(context, filepath, texture_override="", spawn_offset=(0.0, 0.
             nla_strip = track.strips.new(action.name, int(action.frame_range[0]), action)
             p_obj.animation_data.action = None
 
-        bpy.ops.object.select_all(action='DESELECT')
+        for obj in context.selected_objects:
+            obj.select_set(False)
         emitter.select_set(True)
         context.view_layer.objects.active = emitter
 
@@ -588,9 +591,16 @@ def _build_java(context, filepath, texture_override="", spawn_offset=(0.0, 0.0, 
     context.collection.children.link(group_col)
 
     # Java particles don't define emitter shape - use a point emitter
-    bpy.ops.mesh.primitive_cube_add(size=0.02, enter_editmode=False, location=spawn_offset)
-    emitter = context.active_object
-    emitter.name = f"Emitter_{short_name}"
+    import bmesh
+    mesh = bpy.data.meshes.new(f"Emitter_{short_name}_Mesh")
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=0.02)
+    bm.to_mesh(mesh)
+    bm.free()
+    
+    emitter = bpy.data.objects.new(f"Emitter_{short_name}", mesh)
+    emitter.location = spawn_offset
+    context.collection.objects.link(emitter)
     emitter.display_type = 'WIRE'
     
     # Move emitter to new collection
@@ -647,7 +657,8 @@ def _build_java(context, filepath, texture_override="", spawn_offset=(0.0, 0.0, 
     instance_obj.location = (0, 0, -100)
     instance_obj.hide_render = False
 
-    bpy.ops.object.select_all(action='DESELECT')
+    for obj in context.selected_objects:
+        obj.select_set(False)
     emitter.select_set(True)
     context.view_layer.objects.active = emitter
 

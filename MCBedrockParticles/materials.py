@@ -17,16 +17,21 @@ def create_billboard_instance(context, identifier, width=0.1, height=0.1, facing
     short_name = identifier.split(":")[-1] if ":" in identifier else identifier
     name = f"Particle_{short_name}"
 
-    bpy.ops.mesh.primitive_plane_add(size=1.0, enter_editmode=False, location=(0, 0, 0))
-    plane = context.active_object
-    plane.name = name
-
-    # We do NOT apply rotation! Applying rotation destroys the local XY axes,
-    # causing our per-frame `scale=(x, y, 1.0)` to stretch the Z axis incorrectly (creating needles).
-
-    # Scale to default width/height
-    plane.scale = (width, height, 1.0)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    mesh = bpy.data.meshes.new(f"{name}_Mesh")
+    w, h = width / 2.0, height / 2.0
+    mesh.from_pydata(
+        [(-w, -h, 0), (w, -h, 0), (w, h, 0), (-w, h, 0)],
+        [], 
+        [[(0, 1, 2, 3)]]
+    )
+    uv_layer = mesh.uv_layers.new(name="UVMap")
+    uvs = [(0, 0), (1, 0), (1, 1), (0, 1)]
+    for i, loop in enumerate(mesh.loops):
+        uv_layer.data[loop.index].uv = uvs[i]
+    mesh.update()
+    
+    plane = bpy.data.objects.new(name, mesh)
+    context.collection.objects.link(plane)
 
     # Store the facing mode so the builder can reference it during bake
     plane["mc_billboard_mode"] = facing_mode
