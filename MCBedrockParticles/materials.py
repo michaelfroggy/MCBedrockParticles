@@ -22,7 +22,7 @@ def create_billboard_instance(context, identifier, width=0.1, height=0.1, facing
     mesh.from_pydata(
         [(-w, -h, 0), (w, -h, 0), (w, h, 0), (-w, h, 0)],
         [], 
-        [[(0, 1, 2, 3)]]
+        [(0, 1, 2, 3)]
     )
     uv_layer = mesh.uv_layers.new(name="UVMap")
     uvs = [(0, 0), (1, 0), (1, 1), (0, 1)]
